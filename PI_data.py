@@ -144,8 +144,28 @@ def paste_to_gsheet(df, sheet_name):
     if df.empty:
         print(f"Skip: {sheet_name} DataFrame is empty, not pasting.")
         return
+
+    # Clear existing data
     worksheet.batch_clear(["A:AC"])
-    set_with_dataframe(worksheet, df)
+
+    # Calculate exact size needed: rows = data rows + 1 header row, cols = number of columns
+    needed_rows = len(df) + 1
+    needed_cols = len(df.columns)
+
+    # Get current sheet dimensions
+    current_rows = worksheet.row_count
+    current_cols = worksheet.col_count
+
+    # Only resize if we need MORE rows/cols than current — never auto-expand blindly
+    target_rows = max(needed_rows, 1)
+    target_cols = max(needed_cols, current_cols)  # keep existing cols at minimum
+
+    if target_rows != current_rows or target_cols != current_cols:
+        worksheet.resize(rows=target_rows, cols=target_cols)
+        print(f"Resized sheet '{sheet_name}' to {target_rows} rows × {target_cols} cols")
+
+    # Write without letting gspread_dataframe resize again
+    set_with_dataframe(worksheet, df, resize=False)
     print(f"✅ Data pasted to Google Sheet ({sheet_name}).")
 
     # Add timestamp
@@ -153,7 +173,7 @@ def paste_to_gsheet(df, sheet_name):
     local_time = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")
     worksheet.update("AC2", [[f"{local_time}"]])
     print(f"Timestamp written to AC2: {local_time}")
-
+    
 # --------- Main ---------
 if __name__ == "__main__":
     uid = odoo_login()
